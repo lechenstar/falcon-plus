@@ -30,6 +30,7 @@ type Event struct {
 	LeftValue   float64           `json:"leftValue"`
 	CurrentStep int               `json:"currentStep"`
 	EventTime   int64             `json:"eventTime"`
+	FirstEventTime   int64        `json:"firstEventTime"`
 	PushedTags  map[string]string `json:"pushedTags"`
 }
 

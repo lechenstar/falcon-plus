@@ -15,12 +15,13 @@
 package cron
 
 import (
-	"github.com/open-falcon/falcon-plus/common/model"
-	"github.com/open-falcon/falcon-plus/modules/agent/g"
 	"log"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/open-falcon/falcon-plus/common/model"
+	"github.com/open-falcon/falcon-plus/modules/agent/g"
 )
 
 func SyncBuiltinMetrics() {
@@ -42,7 +43,7 @@ func syncBuiltinMetrics() {
 		var ports = []int64{}
 		var paths = []string{}
 		var procs = make(map[string]map[int]string)
-		var urls = make(map[string]string)
+		var urls = make(map[string]g.ReportUrlTags)
 
 		hostname, err := g.Hostname()
 		if err != nil {
@@ -76,19 +77,53 @@ func syncBuiltinMetrics() {
 
 			if metric.Metric == g.URL_CHECK_HEALTH {
 				arr := strings.Split(metric.Tags, ",")
-				if len(arr) != 2 {
+				if len(arr) < 2 {
 					continue
 				}
 				url := strings.Split(arr[0], "=")
 				if len(url) != 2 {
 					continue
 				}
+				//timeout
+				timeout := "3"
 				stime := strings.Split(arr[1], "=")
-				if len(stime) != 2 {
-					continue
+				if len(stime) == 2 {
+					timeout = stime[1]
 				}
-				if _, err := strconv.ParseInt(stime[1], 10, 64); err == nil {
-					urls[url[1]] = stime[1]
+				
+				//method
+				method := "GET"
+				if len(arr) > 2 {
+					smethod := strings.Split(arr[2], "=")
+					if len(method) == 2 {
+						method = smethod[1]
+					}
+				}
+				payload := ""
+				if len(arr) > 3 {
+					//payload
+					spayload := strings.Split(arr[3], "=")
+					if len(payload) == 2 {
+						payload = spayload[1]
+					}
+				}
+				//refValue
+				refValue := ""
+				if len(arr) > 4 {
+					sref := strings.Split(arr[4], "=")
+					if len(sref) == 2 {
+						refValue = sref[1]
+					}
+				}
+
+				if _, err := strconv.ParseInt(timeout, 10, 64); err == nil {
+					temp := g.ReportUrlTags{
+						Timeout: timeout,
+						Method: method,
+						Payload: payload,
+						RefValue: refValue,
+					}
+					urls[url[1]] = temp
 				} else {
 					log.Println("metric ParseInt timeout failed:", err)
 				}
@@ -143,3 +178,4 @@ func syncBuiltinMetrics() {
 
 	}
 }
+

@@ -18,8 +18,12 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"math/rand"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/open-falcon/falcon-plus/common/model"
 	"github.com/open-falcon/falcon-plus/modules/agent/g"
@@ -37,9 +41,9 @@ func UrlMetrics() (L []*model.MetricValue) {
 	if err != nil {
 		hostname = "None"
 	}
-	for furl, timeout := range reportUrls {
-		tags := fmt.Sprintf("url=%v,timeout=%v,src=%v", furl, timeout, hostname)
-		if ok, _ := probeUrl(furl, timeout); !ok {
+	for furl, param := range reportUrls {
+		tags := fmt.Sprintf("url=%v,timeout=%v,method=%v,payload=%v,ref=%v,src=%v", furl, param.Timeout, param.Method, param.Payload, param.RefValue, hostname)
+		if ok, _ := probeUrl(furl, param.Timeout, param.Method, param.Payload, param.RefValue); !ok {
 			L = append(L, GaugeValue(g.URL_CHECK_HEALTH, 0, tags))
 			continue
 		}
@@ -48,21 +52,56 @@ func UrlMetrics() (L []*model.MetricValue) {
 	return
 }
 
-func probeUrl(furl string, timeout string) (bool, error) {
-	bs, err := sys.CmdOutBytes("curl", "--max-filesize", "102400", "-I", "-m", timeout, "-o", "/dev/null", "-s", "-w", "%{http_code}", furl)
+func probeUrl(furl string, timeout string, method string, payload string, refValue string) (bool, error) {
+	outpath := fmt.Sprintf("/tmp/%s.log", GetRandomString(8))
+	//bs, err := sys.CmdOutBytes("curl", "--max-filesize", "102400", "-I", "-m", timeout, "-o", "/dev/null", "-s", "-w", "%{http_code}", furl)
+	var bs []byte
+	var err error
+	if method == "GET" {
+		bs, err = sys.CmdOutBytes("curl", "--max-filesize", "102400", "-m", timeout, "-o", outpath, "-w", "%{http_code}", furl)
+	} else if method == "POST" {
+		bs, err = sys.CmdOutBytes("curl", "-d", payload, "--max-filesize", "102400", "-m", timeout, "-o", outpath, "-w", "%{http_code}", furl)
+	}
 	if err != nil {
 		log.Printf("probe url [%v] failed.the err is: [%v]\n", furl, err)
 		return false, err
 	}
 	reader := bufio.NewReader(bytes.NewBuffer(bs))
-	retcode, err := file.ReadLine(reader)
+	retdata, err := file.ReadLine(reader)
 	if err != nil {
-		log.Println("read retcode failed.err is:", err)
+		fmt.Println("read retcode failed.err is:", err)
 		return false, err
 	}
-	if strings.TrimSpace(string(retcode)) != "200" {
-		log.Printf("return code [%v] is not 200.query url is [%v]", string(retcode), furl)
+	retcode := string(retdata)
+	if strings.TrimSpace(retcode) != "200" {
+		fmt.Printf("return code [%v] is not 200.query url is [%v]", string(retcode), furl)
 		return false, err
 	}
-	return true, err
+	contents, err := ioutil.ReadFile(outpath)
+	if len(refValue) == 0 {
+		return true, err
+	}
+	if err == nil {
+		result := strings.Replace(string(contents), "\n", "", 1)
+		if strings.Contains(result, refValue) {
+			return true, nil
+		} else if ok, _ := regexp.MatchString(refValue, result); ok {
+			return true, nil
+		}
+	}
+
+	return false, nil	
 }
+
+//生成随机字符串
+func GetRandomString(l int) string {
+	str := "0123456789abcdefghijklmnopqrstuvwxyz"
+	bytes := []byte(str)
+	result := []byte{}
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := 0; i < l; i++ {
+		result = append(result, bytes[r.Intn(len(bytes))])
+	}
+	return string(result)
+}
+

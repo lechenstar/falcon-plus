@@ -16,14 +16,15 @@ package g
 
 import (
 	"bytes"
-	"github.com/open-falcon/falcon-plus/common/model"
-	"github.com/toolkits/slice"
 	"log"
 	"net"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/open-falcon/falcon-plus/common/model"
+	"github.com/toolkits/slice"
 )
 
 var Root string
@@ -110,18 +111,25 @@ func SendToTransfer(metrics []*model.MetricValue) {
 	}
 }
 
+type ReportUrlTags struct {
+	Timeout  string
+	Method   string
+	Payload  string
+	RefValue string
+}
+
 var (
-	reportUrls     map[string]string
+	reportUrls     map[string]ReportUrlTags
 	reportUrlsLock = new(sync.RWMutex)
 )
 
-func ReportUrls() map[string]string {
+func ReportUrls() map[string]ReportUrlTags {
 	reportUrlsLock.RLock()
 	defer reportUrlsLock.RUnlock()
 	return reportUrls
 }
 
-func SetReportUrls(urls map[string]string) {
+func SetReportUrls(urls map[string]ReportUrlTags) {
 	reportUrlsLock.RLock()
 	defer reportUrlsLock.RUnlock()
 	reportUrls = urls
@@ -212,3 +220,4 @@ func IsTrustable(remoteAddr string) bool {
 
 	return slice.ContainsString(TrustableIps(), ip)
 }
+

@@ -58,6 +58,10 @@ func consumeHighEvents(event *cmodel.Event, action *api.Action) {
 	mailContent := GenerateMailContent(event)
 	imContent := GenerateIMContent(event)
 
+	if event.Priority() == 0 {
+		HandlePhone(event, action)
+	}
+
 	// <=P2 才发送短信
 	if event.Priority() < 3 {
 		redi.WriteSms(phones, smsContent)
@@ -186,3 +190,4 @@ func ParseUserIm(event *cmodel.Event, action *api.Action) {
 		}
 	}
 }
+

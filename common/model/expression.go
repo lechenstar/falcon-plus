@@ -31,6 +31,7 @@ type Expression struct {
 	Priority   int               `json:"priority"`
 	Note       string            `json:"note"`
 	ActionId   int               `json:"actionId"`
+	AlarmRecovery	int	     `json:"alarmRecovery"`	// e.g.  3 (h)
 }
 
 func (this *Expression) String() string {

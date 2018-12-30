@@ -15,6 +15,7 @@
 package cron
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
@@ -28,7 +29,6 @@ import (
 
 func CombineSms() {
 	for {
-		// 每分钟读取处理一次
 		time.Sleep(time.Minute)
 		combineSms()
 	}
@@ -36,7 +36,6 @@ func CombineSms() {
 
 func CombineMail() {
 	for {
-		// 每分钟读取处理一次
 		time.Sleep(time.Minute)
 		combineMail()
 	}
@@ -44,8 +43,8 @@ func CombineMail() {
 
 func CombineIM() {
 	for {
-		// 每分钟读取处理一次
-		time.Sleep(time.Minute)
+		// 每2分钟读取处理一次
+		time.Sleep(2 * time.Minute)
 		combineIM()
 	}
 }
@@ -165,30 +164,57 @@ func combineSms() {
 		}
 
 		// 把多个sms内容写入数据库，只给用户提供一个链接
-		contentArr := make([]string, size)
-		for i := 0; i < size; i++ {
-			contentArr[i] = arr[i].Content
-		}
-		content := strings.Join(contentArr, ",,")
+		//contentArr := make([]string, size)
+		//for i := 0; i < size; i++ {
+		//	contentArr[i] = arr[i].Content
+		//}
+		//content := strings.Join(contentArr, ",,")
 
-		first := arr[0].Content
-		t := strings.Split(first, "][")
-		eg := ""
-		if len(t) >= 3 {
-			eg = t[2]
+		content := ""
+		endpointMap := make(map[string]int)
+		for i:=0; i<size; i++ {
+			temp := arr[i].Content
+			t := strings.Split(temp, "][")
+			endpoint := ""
+			if len(t) >= 4 {
+				if content == "" {
+					content = t[4]
+				}
+			}
+			if len(t) >= 3{
+				endpoint = t[2]
+			}
+			if endpoint == "" {
+				continue
+			}
+			if _, ok := endpointMap[endpoint]; ok {
+				endpointMap[endpoint] += 1
+			} else {
+				endpointMap[endpoint] = 1
+			}
 		}
-
-		path, err := api.LinkToSMS(content)
+		var buffer bytes.Buffer
+		for key, _ := range endpointMap {
+			buffer.WriteString(key)
+			buffer.WriteString(" ")
+		}
+		buffer.WriteString(content)
+		eg := buffer.String()
+		
+		//disable link
+		//path, err := api.LinkToSMS(content)
+		//sms := ""
+		//if err != nil || path == "" {
+		//	sms = fmt.Sprintf("[P%d][%s] %d %s.  e.g. %s. detail in email", arr[0].Priority, arr[0].Status, size, arr[0].Metric, eg)
+		//	log.Error("get short link fail", err)
+		//} else {
+		//	sms = fmt.Sprintf("[P%d][%s] %d %s e.g. %s %s/portal/links/%s ",
+		//		arr[0].Priority, arr[0].Status, size, arr[0].Metric, eg, g.Config().Api.Dashboard, path)
+		//	log.Debugf("combined sms is:%s", sms)
+		//}
 		sms := ""
-		if err != nil || path == "" {
-			sms = fmt.Sprintf("[P%d][%s] %d %s.  e.g. %s. detail in email", arr[0].Priority, arr[0].Status, size, arr[0].Metric, eg)
-			log.Error("get short link fail", err)
-		} else {
-			sms = fmt.Sprintf("[P%d][%s] %d %s e.g. %s %s/portal/links/%s ",
-				arr[0].Priority, arr[0].Status, size, arr[0].Metric, eg, g.Config().Api.Dashboard, path)
-			log.Debugf("combined sms is:%s", sms)
-		}
-
+		sms = fmt.Sprintf("[P%d][%s][%d %s][example: %s]", arr[0].Priority, arr[0].Status, size, arr[0].Metric, eg)
+		log.Debugf("combined sms is:%s", sms)
 		redi.WriteSms([]string{arr[0].Phone}, sms)
 	}
 }
@@ -291,3 +317,4 @@ func popAllImDto() []*ImDto {
 
 	return ret
 }
+

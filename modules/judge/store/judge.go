@@ -73,10 +73,11 @@ func judgeItemWithStrategy(L *SafeLinkedList, strategy model.Strategy, firstItem
 		Endpoint:   firstItem.Endpoint,
 		LeftValue:  leftValue,
 		EventTime:  firstItem.Timestamp,
+		FirstEventTime:  firstItem.Timestamp,
 		PushedTags: firstItem.Tags,
 	}
 
-	sendEventIfNeed(historyData, isTriggered, now, event, strategy.MaxStep)
+	sendEventIfNeed(historyData, isTriggered, now, event, strategy.MaxStep, strategy.AlarmRecovery)
 }
 
 func sendEvent(event *model.Event) {
@@ -195,14 +196,15 @@ func judgeItemWithExpression(L *SafeLinkedList, expression *model.Expression, fi
 		Endpoint:   firstItem.Endpoint,
 		LeftValue:  leftValue,
 		EventTime:  firstItem.Timestamp,
+		FirstEventTime:  firstItem.Timestamp,
 		PushedTags: firstItem.Tags,
 	}
 
-	sendEventIfNeed(historyData, isTriggered, now, event, expression.MaxStep)
+	sendEventIfNeed(historyData, isTriggered, now, event, expression.MaxStep, expression.AlarmRecovery)
 
 }
 
-func sendEventIfNeed(historyData []*model.HistoryData, isTriggered bool, now int64, event *model.Event, maxStep int) {
+func sendEventIfNeed(historyData []*model.HistoryData, isTriggered bool, now int64, event *model.Event, maxStep int, alarmRecovery int) {
 	lastEvent, exists := g.LastEvents.Get(event.Id)
 	if isTriggered {
 		event.Status = "PROBLEM"
@@ -219,10 +221,20 @@ func sendEventIfNeed(historyData []*model.HistoryData, isTriggered bool, now int
 			return
 		}
 
-		// 逻辑走到这里，说明之前Event是PROBLEM状态
-		if lastEvent.CurrentStep >= maxStep {
-			// 报警次数已经足够多，到达了最多报警次数了，不再报警
-			return
+		if alarmRecovery > 0 {
+			if lastEvent.CurrentStep%maxStep == 0 {
+				if now - lastEvent.FirstEventTime < int64(60*alarmRecovery) {
+					return
+				} else {
+					lastEvent.FirstEventTime = event.FirstEventTime
+				}
+			}
+		} else {
+			// 逻辑走到这里，说明之前Event是PROBLEM状态
+			if lastEvent.CurrentStep >= maxStep {
+				// 报警次数已经足够多，到达了最多报警次数了，不再报警
+				return
+			}
 		}
 
 		if historyData[len(historyData)-1].Timestamp <= lastEvent.EventTime {
@@ -231,12 +243,14 @@ func sendEventIfNeed(historyData []*model.HistoryData, isTriggered bool, now int
 			return
 		}
 
+		// 测试报警恢复功能   报警间隔时间修改为1分钟或者2分钟
 		if now-lastEvent.EventTime < g.Config().Alarm.MinInterval {
 			// 报警不能太频繁，两次报警之间至少要间隔MinInterval秒，否则就不能报警
 			return
 		}
 
 		event.CurrentStep = lastEvent.CurrentStep + 1
+		event.FirstEventTime = lastEvent.FirstEventTime
 		sendEvent(event)
 	} else {
 		// 如果LastEvent是Problem，报OK，否则啥都不做

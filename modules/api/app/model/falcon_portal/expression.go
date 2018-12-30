@@ -42,4 +42,8 @@ type Expression struct {
 	ActionId   int64  `json:"action_id" gorm:"column:action_id"`
 	CreateUser string `json:"create_user" gorm:"column:create_user"`
 	Pause      int    `json:"pause" gorm:"column:pause"`
+	MaintainBegin int64 `json:"maintain_begin" gorm:"column:maintain_begin"`
+	MaintainEnd int64 `json:"maintain_end" gorm:"column:maintain_end"`
+	AlarmRecovery int64 `json:"alarm_recovery" gorm:"column:alarm_recovery"`
 }
+

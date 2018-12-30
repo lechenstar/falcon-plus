@@ -31,6 +31,7 @@ type Strategy struct {
 	Priority   int               `json:"priority"`
 	Note       string            `json:"note"`
 	Tpl        *Template         `json:"tpl"`
+	AlarmRecovery	int	     `json:"alarmRecovery"`	// e.g.  3 (h)
 }
 
 func (this *Strategy) String() string {
